@@ -48,9 +48,28 @@ def _GetDataset():
             )
     
 
-def HowToRunOneEpochWithBatch():
+def _OneEpochTraining(session, images, labels, show=False):
     '''
-    demonstrate how to run one epoch and pack data into batches
+    this is a small demo,
+    but for real project, we need to implement a training process for one epoch here
+    '''
+    
+    try:
+        while True:
+            val_images, val_labels = session.run([images, labels])
+            print('label is {}'.format(val_labels))
+            if show and len(images.shape)==4:
+                _ShowBatch(val_images)
+            if show and len(images.shape)==3:
+                _ShowImg(val_images)
+    except tf.errors.OutOfRangeError:
+        print('Done training -- this is the end of epoch')
+    return
+        
+        
+def HowToRunOneEpoch():
+    '''
+    demonstrate how to run one epoch with shuffling
     '''
     my_dataset = _GetDataset()
     provider = slim.dataset_data_provider.DatasetDataProvider(
@@ -64,26 +83,22 @@ def HowToRunOneEpochWithBatch():
     
     [image, label] = provider.get(['image', 'label'])
     
-    
-    images, labels = tf.train.batch(
-                [image, label],
-                batch_size=cfg.BATCH_SIZE,
-                num_threads = 4,                # The number of threads used to create the batches.
-                capacity= 5 * cfg.BATCH_SIZE,   # The maximum number of elements in the queue.
-                allow_smaller_final_batch=True, # If True, allow the final batch to be smaller if there are insufficient items left in the queue.
-                )
-    
-    batch_queue = slim.prefetch_queue.prefetch_queue([images, labels], capacity=5)
-            
-    images, labels = batch_queue.dequeue()
+    '''
+    preprocessing
+    here is a demo with one hot transformation
+    in real project, we need to perform data augmentation here
+    '''
+    label = slim.one_hot_encoding(label, cfg.NUM_CLASSES)
     
     # note, num_epochs must be initialized by local variables initializer
     op_init = tf.local_variables_initializer()
     with tf.Session() as sess:
         sess.run(op_init)
         with queues.QueueRunners(sess):
-            _OneEpochTraining(sess, images, labels)
-            
+            _OneEpochTraining(sess, image, label, show=True)
+                    
+                
+      
 
 if __name__=='__main__':
     HowToRunOneEpoch()
