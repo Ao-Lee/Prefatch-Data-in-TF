@@ -98,7 +98,42 @@ def HowToRunOneEpoch():
             _OneEpochTraining(sess, image, label, show=True)
                     
                 
-      
+def HowToRunOneEpochWithBatch():
+    '''
+    demonstrate how to run one epoch and pack data into batches
+    '''
+    my_dataset = _GetDataset()
+    provider = slim.dataset_data_provider.DatasetDataProvider(
+                    my_dataset, 
+                    num_readers=4,  # The number of parallel readers that read data from the dataset
+                    shuffle=True,   # Whether to shuffle the data sources and common queue when reading
+                    num_epochs=1,   # The number of times each data source is read. If left as None, the data will be cycled through indefinitely.
+                    common_queue_capacity = 20*cfg.BATCH_SIZE,   # The capacity of the common queue.
+                    common_queue_min= 10*cfg.BATCH_SIZE,         # The minimum number of elements in the common queue after a dequeue.
+                    ) 
+    
+    [image, label] = provider.get(['image', 'label'])
+    
+    
+    images, labels = tf.train.batch(
+                [image, label],
+                batch_size=cfg.BATCH_SIZE,
+                num_threads = 4,                # The number of threads used to create the batches.
+                capacity= 5 * cfg.BATCH_SIZE,   # The maximum number of elements in the queue.
+                allow_smaller_final_batch=True, # If True, allow the final batch to be smaller if there are insufficient items left in the queue.
+                )
+    
+    batch_queue = slim.prefetch_queue.prefetch_queue([images, labels], capacity=5)
+            
+    images, labels = batch_queue.dequeue()
+    
+    # note, num_epochs must be initialized by local variables initializer
+    op_init = tf.local_variables_initializer()
+    with tf.Session() as sess:
+        sess.run(op_init)
+        with queues.QueueRunners(sess):
+            _OneEpochTraining(sess, images, labels)
+            
 
 if __name__=='__main__':
     HowToRunOneEpoch()
